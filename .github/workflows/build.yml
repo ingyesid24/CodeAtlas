@@ -15,16 +15,23 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: linux
-            glob: release/*.AppImage
+            glob: |
+              release/*.AppImage
             args: --linux AppImage
+            cache: ~/.cache/electron-builder
           - os: windows-latest
             artifact: windows
-            glob: release/*.exe
+            glob: |
+              release/*.exe
             args: --win nsis portable
+            cache: ~/AppData/Local/electron-builder/Cache
           - os: macos-latest
             artifact: macos
-            glob: release/*.dmg release/*.zip
+            glob: |
+              release/*.dmg
+              release/*.zip
             args: --mac dmg zip
+            cache: ~/Library/Caches/electron-builder
     runs-on: ${{ matrix.os }}
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -34,9 +41,24 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Cache electron-builder binaries
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.cache }}
+          key: electron-builder-${{ matrix.os }}
       - run: npm ci
       - run: npm run build
-      - run: npx electron-builder --publish never ${{ matrix.args }}
+      - name: Package app (retry on transient binary download failures)
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            echo "electron-builder attempt $attempt"
+            if npx electron-builder --publish never ${{ matrix.args }}; then
+              exit 0
+            fi
+            sleep 15
+          done
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: codeatlas-${{ matrix.artifact }}
