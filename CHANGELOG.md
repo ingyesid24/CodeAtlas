@@ -4,6 +4,24 @@ Todas las versiones notables de CodeAtlas se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y el versionado es [SemVer](https://semver.org/lang/es/).
 
+## [1.3.1] - 2026-09-21
+
+Hotfix: launcher estable de Linux AppImage.
+
+### Corregido
+
+- El acceso del menú de aplicaciones (`.desktop`) dejaba de funcionar tras una actualización automática: apuntaba a un AppImage con nombre versionado (`CodeAtlas-1.2.0.AppImage`) que cambia de nombre al actualizar.
+- Ahora el `.desktop` apunta a un launcher estable en `~/.local/bin/codeatlas` que busca el AppImage más reciente en el directorio de instalación y lo ejecuta. Las futuras actualizaciones no romperán el acceso.
+- Si el launcher no encuentra ningún AppImage, muestra un mensaje claro con el enlace de descarga.
+
+### Nota para instalaciones ya afectadas
+
+Si el acceso del menú quedó roto por una actualización previa: descarga el último AppImage desde GitHub Releases y ejecútalo una vez. La app regenerará el launcher y el `.desktop` correctos.
+
+### Pruebas
+
+- Nuevo módulo `src/platform/linuxLauncher.ts` con tests: script del launcher, entrada `.desktop` estable y resolución de rutas.
+
 ## [1.3.0] - 2026-09-21
 
 Fase: análisis AST.
@@ -96,6 +114,7 @@ MVP: analizador JavaScript/TypeScript y aplicación Electron.
 - Suite automatizada del analizador con Vitest.
 - Workflow de GitHub Actions para compilar Linux, Windows y macOS y publicar releases al crear un tag `v*`.
 
+[1.3.1]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.3.1
 [1.3.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.3.0
 [1.2.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.2.0
 [1.1.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.1.0

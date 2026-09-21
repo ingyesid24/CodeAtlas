@@ -8,6 +8,11 @@ import { autoUpdater } from 'electron-updater';
 import type { AnalysisProgress } from '../src/analyzer/types';
 import type { UpdateStatus } from './preload';
 import {
+  buildDesktopEntry,
+  buildLauncherScript,
+  launcherPath
+} from '../src/platform/linuxLauncher';
+import {
   buildEditorCommand,
   buildEditorDeepLink,
   EDITORS,
@@ -117,25 +122,28 @@ function ensureDesktopIntegration() {
   if (!app.isPackaged || process.platform !== 'linux' || !process.env.APPIMAGE) return;
 
   try {
-    const appsDir = path.join(os.homedir(), '.local/share/applications');
-    const iconsDir = path.join(os.homedir(), '.local/share/icons/hicolor/512x512/apps');
+    const homeDir = os.homedir();
+    const appsDir = path.join(homeDir, '.local/share/applications');
+    const iconsDir = path.join(homeDir, '.local/share/icons/hicolor/512x512/apps');
     const desktopPath = path.join(appsDir, 'codeatlas.desktop');
     const iconPath = path.join(iconsDir, 'codeatlas.png');
     const iconSource = path.join(__dirname, '../../build/icon.png');
 
-    const desktopEntry =
-      [
-        '[Desktop Entry]',
-        'Name=CodeAtlas',
-        'Comment=Understand any codebase in minutes.',
-        `Exec="${process.env.APPIMAGE}" --no-sandbox %U`,
-        'Terminal=false',
-        'Type=Application',
-        'Icon=codeatlas',
-        'StartupWMClass=CodeAtlas',
-        'Categories=Development;'
-      ].join('\n') + '\n';
+    // Launcher estable: el .desktop nunca apunta a un AppImage con nombre
+    // versionado (que cambia con cada actualización). El script busca el
+    // AppImage más reciente en el directorio de instalación y lo ejecuta.
+    const launcher = launcherPath(homeDir);
+    const appImageDir = path.dirname(process.env.APPIMAGE);
+    const launcherScript = buildLauncherScript(appImageDir);
+    const existingLauncher = fs.existsSync(launcher) ? fs.readFileSync(launcher, 'utf8') : null;
+    if (existingLauncher !== launcherScript) {
+      fs.mkdirSync(path.dirname(launcher), { recursive: true });
+      fs.writeFileSync(launcher, launcherScript, { mode: 0o755 });
+      fs.chmodSync(launcher, 0o755);
+    }
 
+    // Entrada .desktop estable (apunta al launcher, no al AppImage versionado).
+    const desktopEntry = buildDesktopEntry(launcher);
     const existingDesktop = fs.existsSync(desktopPath) ? fs.readFileSync(desktopPath, 'utf8') : null;
     if (existingDesktop !== desktopEntry) {
       fs.mkdirSync(appsDir, { recursive: true });
@@ -147,7 +155,7 @@ function ensureDesktopIntegration() {
       fs.copyFileSync(iconSource, iconPath);
     }
 
-    execFile('gtk-update-icon-cache', [path.join(os.homedir(), '.local/share/icons')], () => undefined);
+    execFile('gtk-update-icon-cache', [path.join(homeDir, '.local/share/icons')], () => undefined);
     execFile('update-desktop-database', [appsDir], () => undefined);
   } catch {
     // La integración es best-effort: si falla, la app arranca igual.

@@ -8,7 +8,7 @@ CodeAtlas es una aplicación de escritorio que analiza proyectos locales y prese
 
 | Campo          | Valor                                                  |
 | -------------- | ------------------------------------------------------ |
-| **Versión**    | `1.3.0` (`package.json`) — visible en la barra de la app |
+| **Versión**    | `1.3.1` (`package.json`) — visible en la barra de la app |
 | **Fase**       | v1.3 · análisis AST                                    |
 | **Licencia**   | MIT                                                    |
 
@@ -233,7 +233,7 @@ Genera los artefactos del sistema operativo actual en `release/`:
 
 Cada plataforma se compila en su propio sistema: Windows no se puede empaquetar desde Linux (requiere Wine) y macOS solo se empaqueta en macOS. El workflow `.github/workflows/build.yml` compila las tres plataformas en GitHub Actions y publica un release automáticamente al crear un tag `v*`. La firma se habilita configurando `CSC_LINK`/`CSC_KEY_PASSWORD` (macOS y Windows) en el CI.
 
-En Linux, la primera vez que se ejecuta el AppImage la app se integra sola en el menú y el dock de GNOME (genera la entrada `.desktop` y el ícono en `~/.local/share`).
+En Linux, la primera vez que se ejecuta el AppImage la app se integra sola en el menú y el dock de GNOME (genera la entrada `.desktop` y el ícono en `~/.local/share`). El acceso usa un launcher estable (`~/.local/bin/codeatlas`) que busca el AppImage más reciente, de modo que las actualizaciones automáticas no rompen el acceso del menú.
 
 ## Estructura
 
