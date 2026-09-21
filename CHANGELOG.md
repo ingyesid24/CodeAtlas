@@ -4,6 +4,32 @@ Todas las versiones notables de CodeAtlas se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y el versionado es [SemVer](https://semver.org/lang/es/).
 
+## [1.3.0] - 2026-09-21
+
+Fase: análisis AST.
+
+### Añadido
+
+- Parser de AST real (`@typescript-eslint/typescript-estree`) para el análisis de código.
+- Imports/`require`: soporte de imports multilínea y template literals sin interpolación.
+- Variables de entorno: detección de destructuring (`const { PORT } = process.env`).
+- Rutas Express: soporte de llamadas multilínea y template literals sin interpolación.
+- Respaldo por regex si un archivo no se puede parsear (sintaxis rota).
+
+### Cambiado
+
+- `envscan.ts`, `routescan.ts` e `importscan.ts` migrados de regex a AST.
+- Versión de `1.2.0` a `1.3.0`.
+
+### Corregido
+
+- Los comentarios y strings ya no generan falsos positivos: `// app.get('/x')`, `// import './y'` o textos que mencionan `process.env.X` ya no cuentan como código.
+- Rutas Express multilínea ahora se detectan correctamente.
+
+### Pruebas
+
+- Suite ampliada a 133 tests: imports multilínea, destructuring de `process.env`, rutas multilínea, plantillas sin interpolación y comentarios/strings ignorados.
+
 ## [1.2.0] - 2026-09-21
 
 Fase: actualizaciones automáticas.
@@ -70,6 +96,7 @@ MVP: analizador JavaScript/TypeScript y aplicación Electron.
 - Suite automatizada del analizador con Vitest.
 - Workflow de GitHub Actions para compilar Linux, Windows y macOS y publicar releases al crear un tag `v*`.
 
+[1.3.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.3.0
 [1.2.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.2.0
 [1.1.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.1.0
 [0.1.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v0.1.0

@@ -81,4 +81,33 @@ describe('scanEnvVars', () => {
 
     expect(names).toEqual(['ALPHA', 'MID', 'ZETA']);
   });
+
+  it('detecta destructuring: const { PORT } = process.env', () => {
+    const root = setup({
+      'index.js': 'const { PORT, DATABASE_URL: dbUrl } = process.env;'
+    });
+
+    expect(scanEnvVars(root)).toEqual([
+      { name: 'DATABASE_URL', files: ['index.js'] },
+      { name: 'PORT', files: ['index.js'] }
+    ]);
+  });
+
+  it('ignora los comentarios y los strings que mencionan process.env', () => {
+    const root = setup({
+      'index.js': [
+        '// process.env.FAKE_PORT',
+        'const hint = "usa process.env.FAKE_KEY en tu .env";',
+        'const real = process.env.REAL_KEY;'
+      ].join('\n')
+    });
+
+    expect(scanEnvVars(root)).toEqual([{ name: 'REAL_KEY', files: ['index.js'] }]);
+  });
+
+  it('ignora el acceso dinámico process.env[nombre]', () => {
+    const root = setup({ 'index.js': 'const key = "PORT"; process.env[key];' });
+
+    expect(scanEnvVars(root)).toEqual([]);
+  });
 });

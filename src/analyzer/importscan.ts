@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { literalValue, parseSourceFile, walk } from './astscan';
 import { normalizeGraphPath } from './graph';
 import { collectSourceFiles, SOURCE_EXTENSIONS, type SourceFile } from './scanner';
 import type { ImportInfo } from './types';
@@ -89,31 +90,84 @@ export function scanImports(
       continue;
     }
 
-    const seen = new Set<string>();
-    const lines = content.split('\n');
-    lines.forEach((lineText, idx) => {
-      const push = (specifier: string) => {
-        if (seen.has(specifier)) return;
-        seen.add(specifier);
-        imports.push({
-          file: normalizedRelPath,
-          specifier,
-          line: idx + 1,
-          target: resolveRelativeSpecifier(rootPath, normalizedRelPath, specifier)
-        });
-      };
+    // Intenta el escaneo por AST (devuelve true si el archivo se parseó).
+    let parsed = false;
+    try {
+      const program = parseSourceFile(content);
+      if (program) {
+        parsed = true;
+        const seen = new Set<string>();
+        const push = (specifier: string, line: number) => {
+          if (seen.has(specifier)) return;
+          seen.add(specifier);
+          imports.push({
+            file: normalizedRelPath,
+            specifier,
+            line,
+            target: resolveRelativeSpecifier(rootPath, normalizedRelPath, specifier)
+          });
+        };
 
-      for (const regex of [
-        STATIC_IMPORT_REGEX,
-        EXPORT_FROM_REGEX,
-        DYNAMIC_IMPORT_REGEX,
-        REQUIRE_REGEX
-      ]) {
-        regex.lastIndex = 0;
-        let match: RegExpExecArray | null;
-        while ((match = regex.exec(lineText)) !== null) push(match[1]);
+        walk(program, (node) => {
+          switch (node.type) {
+            case 'ImportDeclaration': {
+              const specifier = literalValue(node.source);
+              if (specifier !== undefined) push(specifier, node.loc?.start.line ?? 0);
+              break;
+            }
+            case 'ExportNamedDeclaration':
+            case 'ExportAllDeclaration': {
+              const specifier = literalValue(node.source);
+              if (specifier !== undefined) push(specifier, node.loc?.start.line ?? 0);
+              break;
+            }
+            case 'ImportExpression': {
+              const specifier = literalValue(node.source);
+              if (specifier !== undefined) push(specifier, node.loc?.start.line ?? 0);
+              break;
+            }
+            case 'CallExpression': {
+              const callee = node.callee;
+              if (callee.type !== 'Identifier' || callee.name !== 'require') break;
+              const specifier = literalValue(node.arguments[0]);
+              if (specifier !== undefined) push(specifier, node.loc?.start.line ?? 0);
+              break;
+            }
+          }
+        });
       }
-    });
+    } catch {
+      parsed = false;
+    }
+
+    // Respaldo por regex solo si el archivo no se pudo parsear.
+    if (!parsed) {
+      const seen = new Set<string>();
+      const lines = content.split('\n');
+      lines.forEach((lineText, idx) => {
+        const push = (specifier: string) => {
+          if (seen.has(specifier)) return;
+          seen.add(specifier);
+          imports.push({
+            file: normalizedRelPath,
+            specifier,
+            line: idx + 1,
+            target: resolveRelativeSpecifier(rootPath, normalizedRelPath, specifier)
+          });
+        };
+
+        for (const regex of [
+          STATIC_IMPORT_REGEX,
+          EXPORT_FROM_REGEX,
+          DYNAMIC_IMPORT_REGEX,
+          REQUIRE_REGEX
+        ]) {
+          regex.lastIndex = 0;
+          let match: RegExpExecArray | null;
+          while ((match = regex.exec(lineText)) !== null) push(match[1]);
+        }
+      });
+    }
   }
 
   return imports;

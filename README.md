@@ -8,8 +8,8 @@ CodeAtlas es una aplicación de escritorio que analiza proyectos locales y prese
 
 | Campo          | Valor                                                  |
 | -------------- | ------------------------------------------------------ |
-| **Versión**    | `1.2.0` (`package.json`) — visible en la barra de la app |
-| **Fase**       | v1.2 · actualizaciones automáticas                     |
+| **Versión**    | `1.3.0` (`package.json`) — visible en la barra de la app |
+| **Fase**       | v1.3 · análisis AST                                    |
 | **Licencia**   | MIT                                                    |
 
 ### Plataformas disponibles
@@ -31,6 +31,14 @@ Los binarios se generan automáticamente con GitHub Actions al crear un tag `v*`
 > Los binarios no están firmados: en Windows el SmartScreen y en macOS Gatekeeper mostrarán una advertencia al primer arranque (se salta con "Más información → Ejecutar de todas formas" / clic derecho → Abrir).
 
 ## Estado actual
+
+La v1.3 migra los detectores a un AST real (`@typescript-eslint/typescript-estree`):
+
+- Imports/`require`, rutas Express y variables de entorno se detectan sobre el árbol sintáctico, no por regex.
+- Los comentarios y strings ya no cuentan como código: `// app.get('/x')` o `// import './y'` no generan falsos positivos.
+- Soporte de imports multilínea, destructuring de `process.env` (`const { PORT } = process.env`) y template literals sin interpolación.
+- Los archivos con errores de sintaxis usan el escaneo por regex anterior como respaldo (nada se pierde).
+- NestJS sigue con su detector heurístico (regex), ya probado y documentado.
 
 La v1.2 añade actualizaciones automáticas:
 
@@ -54,8 +62,8 @@ El núcleo del MVP incluye:
 - Selección segura de un repositorio local mediante IPC.
 - Árbol de archivos con exclusión de dependencias y artefactos de build.
 - Detección y parseo de `package.json`.
-- Detección de usos de `process.env`.
-- Detección heurística de rutas Express y NestJS (decoradores `@Controller`/`@Get`/`@Post` y similares), con método, ruta completa, archivo y línea. Sus límites se documentan en la sección [Límites de los detectores heurísticos](#límites-de-los-detectores-heurísticos-v11).
+- Detección de usos de `process.env` (incluido destructuring, v1.3).
+- Detección de rutas Express y NestJS (decoradores `@Controller`/`@Get`/`@Post` y similares), con método, ruta completa, archivo y línea. Sus límites se documentan en la sección [Límites de los detectores](#límites-de-los-detectores-v13).
 - Detección de imports y `require`, resolviendo rutas relativas entre módulos.
 - Modelo de grafo común para archivos, rutas, variables, paquetes y dependencias.
 - Mapa interactivo con React Flow: pan, zoom, minimapa y nodos coloreados por tipo.
@@ -65,19 +73,18 @@ El núcleo del MVP incluye:
 - Análisis en un `worker_threads` dedicado: Electron nunca se congela y la interfaz muestra una barra de progreso con fases y porcentaje en vivo.
 - Suite automatizada del analizador con Vitest.
 
-## Límites de los detectores heurísticos (v1.1)
+## Límites de los detectores (v1.3)
 
-Los detectores del analizador son **heurísticos basados en expresiones regulares**, no en un AST real: pueden arrojar falsos positivos y falsos negativos. Son útiles para orientarse en un proyecto desconocido, no para auditorías exhaustivas. La suite de pruebas cubre los comportamientos descritos aquí.
+Desde la v1.3, los detectores de imports, rutas Express y variables de entorno analizan el **AST real** del archivo (`@typescript-eslint/typescript-estree`): los comentarios y strings ya no generan falsos positivos y los imports multilínea se detectan. Si un archivo no se puede parsear (sintaxis rota), se usa el escaneo por regex anterior como respaldo. El detector de NestJS sigue siendo heurístico (regex). La suite de pruebas cubre los comportamientos descritos aquí.
 
 ### Rutas Express (`src/analyzer/routescan.ts`)
 
-Detecta llamadas `app|router|api` o variables terminadas en `Router`/`App` con métodos `get/post/put/patch/delete/all/use` y una ruta literal entre comillas. Límites:
+Detecta llamadas `app|router|api` o variables terminadas en `Router`/`App` con métodos `get/post/put/patch/delete/all/use` y una ruta literal. Límites:
 
-- Solo rutas de una línea: las llamadas multilínea no se detectan.
-- Solo rutas literales: las plantillas o variables (`app.get(\`/users/${id}\`, ...)`) se omiten.
 - Solo receptores con nombres reconocibles: si el router se renombra (`const myRouter = express.Router()` → `myRouter.get(...)` no es `*Router`), no se detecta.
 - Falsos positivos: `app.use('/estatico', express.static(...))` se registra como ruta, y cualquier variable que cumpla el patrón de nombre (p. ej. `userRouter.get(...)`) aunque no sea Express.
-- Los comentarios (`// app.get('/x')`) se detectan como rutas.
+- Las plantillas con interpolación (`app.get(\`/users/${id}\`, ...)`) se omiten; las plantillas sin interpolación sí se detectan.
+- Los comentarios y strings ya no se detectan como rutas (desde v1.3).
 
 ### Rutas NestJS (`src/analyzer/nestscan.ts`)
 
@@ -90,18 +97,18 @@ Detecta decoradores `@Controller`, `@Get`, `@Post`, `@Put`, `@Patch`, `@Delete`,
 
 ### Variables de entorno (`src/analyzer/envscan.ts`)
 
-Detecta `process.env.NOMBRE` y `process.env['NOMBRE']` en código JS/TS. Límites:
+Detecta `process.env.NOMBRE`, `process.env['NOMBRE']` y el destructuring (`const { PORT } = process.env`) en código JS/TS. Límites:
 
-- No detecta destructuring (`const { PORT } = process.env`) ni acceso dinámico (`process.env[nombre]`).
-- Los comentarios que mencionan `process.env.X` cuentan como uso.
+- No detecta el acceso dinámico (`process.env[nombre]`).
 - No lee archivos `.env` ni `.env.example`; solo detecta usos en el código.
+- Los comentarios y strings que mencionan `process.env.X` ya no cuentan como uso (desde v1.3).
 
 ### Imports (`src/analyzer/importscan.ts`)
 
-Detecta `import`, `export ... from`, `import(...)` y `require(...)` con comillas simples o dobles; resuelve specifiers relativos probando extensiones e index de carpeta. Límites:
+Detecta `import`, `export ... from`, `import(...)` y `require(...)`, incluidos imports multilínea y template literals sin interpolación; resuelve specifiers relativos probando extensiones e index de carpeta. Límites:
 
-- No soporta specifiers con backticks ni imports multilínea (`import {\n a \n} from '...'`).
-- Los comentarios con imports se detectan como imports reales.
+- Los specifiers dinámicos (con interpolación) quedan sin `target` resuelto.
+- Los comentarios con imports ya no se detectan como imports reales (desde v1.3).
 - Los specifiers de `node_modules` y los alias de tsconfig (`@/...`) quedan sin `target` resuelto.
 - Solo se escanean `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs` y `.cjs`.
 
@@ -115,7 +122,7 @@ Detecta `import`, `export ... from`, `import(...)` y `require(...)` con comillas
 
 ### Alcance
 
-- v1.1 analiza únicamente proyectos JavaScript y TypeScript.
+- v1.3 analiza únicamente proyectos JavaScript y TypeScript.
 
 ## Formato del grafo (`ArchitectureGraph`)
 
@@ -198,6 +205,7 @@ La cobertura funcional actual incluye:
 - Progreso del análisis: fases, avance por archivo y rango monótono [0, 1].
 - Mapeo visual: ids estables, posiciones deterministas, regiones por tipo y colores.
 - Toggle de tipos: filtrado sin mutar el grafo original y conservación de aristas.
+- Detección por AST: imports multilínea, destructuring de `process.env`, rutas Express multilínea, y comentarios/strings ignorados en envscan, routescan e importscan.
 - Búsqueda: coincidencia por label y detalle, insensible a mayúsculas, y conservación de aristas.
 - Límite de tamaño de archivos fuente en `collectSourceFiles`.
 

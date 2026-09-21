@@ -115,4 +115,49 @@ describe('scanImports', () => {
 
     expect(scanImports(root)).toEqual([]);
   });
+
+  it('detecta imports multilínea', () => {
+    const root = setup({
+      'index.ts': [
+        'import {',
+        '  helper,',
+        '  otro',
+        "} from './modulo';"
+      ].join('\n'),
+      'modulo.ts': 'export const helper = 1; export const otro = 2;'
+    });
+
+    expect(scanImports(root)).toEqual([
+      { file: 'index.ts', specifier: './modulo', line: 1, target: 'modulo.ts' }
+    ]);
+  });
+
+  it('ignora imports y require mencionados en comentarios', () => {
+    const root = setup({
+      'index.ts': [
+        "// import './fake';",
+        "const hint = \"require('./also-fake')\";",
+        "import './real';"
+      ].join('\n'),
+      'real.ts': 'export {};'
+    });
+
+    expect(scanImports(root)).toEqual([
+      { file: 'index.ts', specifier: './real', line: 3, target: 'real.ts' }
+    ]);
+  });
+
+  it('acepta template literals sin interpolación en require', () => {
+    const root = setup({
+      'index.ts': [
+        'const helper = require(`./helper`);',
+        'const dynamic = require(`./mod-${name}`);'
+      ].join('\n'),
+      'helper.ts': 'module.exports = {};'
+    });
+
+    expect(scanImports(root)).toEqual([
+      { file: 'index.ts', specifier: './helper', line: 1, target: 'helper.ts' }
+    ]);
+  });
 });

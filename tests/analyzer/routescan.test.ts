@@ -120,4 +120,46 @@ describe('scanExpressRoutes', () => {
 
     expect(scanExpressRoutes(root)).toEqual([]);
   });
+
+  it('detecta llamadas multilínea', () => {
+    const root = setup({
+      'index.js': [
+        "router.get(",
+        "  '/users',",
+        "  listUsers",
+        ");"
+      ].join('\n')
+    });
+
+    expect(scanExpressRoutes(root)).toEqual([
+      { method: 'GET', path: '/users', file: 'index.js', line: 1 }
+    ]);
+  });
+
+  it('ignora rutas en comentarios y strings', () => {
+    const root = setup({
+      'index.js': [
+        "// app.get('/fake', handler);",
+        "const doc = \"router.post('/also-fake', handler);\";",
+        "router.get('/real', handler);"
+      ].join('\n')
+    });
+
+    expect(scanExpressRoutes(root)).toEqual([
+      { method: 'GET', path: '/real', file: 'index.js', line: 3 }
+    ]);
+  });
+
+  it('acepta template literals sin interpolación y omite los que la tienen', () => {
+    const root = setup({
+      'index.ts': [
+        'router.get(`/fixed`, handler);',
+        'router.get(`/users/${id}`, handler);'
+      ].join('\n')
+    });
+
+    expect(scanExpressRoutes(root)).toEqual([
+      { method: 'GET', path: '/fixed', file: 'index.ts', line: 1 }
+    ]);
+  });
 });
