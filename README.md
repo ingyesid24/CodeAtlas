@@ -246,16 +246,19 @@ codeatlas/
 │   └── tsconfig.json
 ├── src/
 │   ├── analyzer/
+│   │   ├── astscan.ts       # Parser AST compartido (typescript-estree)
 │   │   ├── scanner.ts       # Árbol y package.json
-│   │   ├── envscan.ts       # Variables de entorno
-│   │   ├── routescan.ts     # Rutas Express
-│   │   ├── nestscan.ts      # Rutas NestJS (decoradores)
-│   │   ├── importscan.ts    # Imports y require entre módulos
+│   │   ├── envscan.ts       # Variables de entorno (AST + fallback regex)
+│   │   ├── routescan.ts     # Rutas Express (AST + fallback regex)
+│   │   ├── nestscan.ts      # Rutas NestJS (decoradores, regex)
+│   │   ├── importscan.ts    # Imports y require entre módulos (AST + fallback regex)
 │   │   ├── graph.ts         # Grafo común y IDs estables
 │   │   ├── types.ts         # Contratos del análisis
 │   │   └── index.ts         # Orquestación
 │   ├── editors/
 │   │   └── registry.ts      # IDEs soportados y builders de apertura
+│   ├── platform/
+│   │   └── linuxLauncher.ts # Launcher estable del AppImage y entrada .desktop
 │   ├── components/
 │   │   ├── TreeView.tsx
 │   │   ├── GraphView.tsx      # Lienzo React Flow y panel de detalles
@@ -266,6 +269,7 @@ codeatlas/
 ├── tests/
 │   ├── analyzer/            # Pruebas unitarias e integración
 │   ├── graphview/           # Pruebas del mapeo visual
+│   ├── platform/            # Pruebas del launcher de Linux
 │   └── helpers/             # Fixtures temporales
 ├── tsconfig.json            # Renderer
 ├── tsconfig.test.json       # Pruebas
@@ -278,6 +282,8 @@ codeatlas/
 El renderer no accede directamente a Node.js. `preload.ts` expone una API mínima mediante `contextBridge`, el proceso principal valida las entradas IPC y el analizador usa únicamente APIs de Node (`fs` y `path`).
 
 El análisis corre en un hilo aparte (`electron/analyzerWorker.ts`, vía `worker_threads`): el proceso principal valida la ruta, lanza el worker y reenvía al renderer los eventos de progreso por IPC; el renderer no se congela aunque el proyecto sea grande.
+
+En Linux AppImage, `ensureDesktopIntegration()` escribe un launcher estable (`~/.local/bin/codeatlas`, `src/platform/linuxLauncher.ts`) y una entrada `.desktop` que siempre apunta a ese launcher, no al AppImage versionado: así las actualizaciones automáticas no rompen el acceso del menú. El launcher busca el AppImage más reciente en el directorio de instalación y lo ejecuta.
 
 `ArchitectureGraph` es un modelo de dominio serializable e independiente de React Flow. Sus IDs y rutas están normalizados para que el mismo análisis sea estable en distintos sistemas operativos. `graphMapper.ts` convierte el modelo en nodos y aristas de React Flow con posiciones deterministas, y `GraphView.tsx` lo renderiza en el mapa interactivo de módulos.
 
