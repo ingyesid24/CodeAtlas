@@ -8,7 +8,7 @@ CodeAtlas es una aplicación de escritorio que analiza proyectos locales y prese
 
 | Campo          | Valor                                                  |
 | -------------- | ------------------------------------------------------ |
-| **Versión**    | `1.3.1` (`package.json`) — visible en la barra de la app |
+| **Versión**    | `1.3.2` (`package.json`) — visible en la barra de la app |
 | **Fase**       | v1.3 · análisis AST                                    |
 | **Licencia**   | MIT                                                    |
 

@@ -4,6 +4,15 @@ Todas las versiones notables de CodeAtlas se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y el versionado es [SemVer](https://semver.org/lang/es/).
 
+## [1.3.2] - 2026-09-21
+
+Hotfix: dependencia de producción para el parser AST.
+
+### Corregido
+
+- El AppImage fallaba al analizar con `Cannot find module 'typescript'`: `@typescript-eslint/typescript-estree` necesita `typescript` en tiempo de ejecución, pero estaba en `devDependencies` y electron-builder lo excluía del paquete final.
+- `typescript` se movió a `dependencies` y ahora viaja dentro del AppImage (verificado: el parser carga `typescript` desde el app.asar).
+
 ## [1.3.1] - 2026-09-21
 
 Hotfix: launcher estable de Linux AppImage.
@@ -114,6 +123,7 @@ MVP: analizador JavaScript/TypeScript y aplicación Electron.
 - Suite automatizada del analizador con Vitest.
 - Workflow de GitHub Actions para compilar Linux, Windows y macOS y publicar releases al crear un tag `v*`.
 
+[1.3.2]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.3.2
 [1.3.1]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.3.1
 [1.3.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.3.0
 [1.2.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.2.0
