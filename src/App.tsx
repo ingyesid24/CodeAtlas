@@ -18,6 +18,7 @@ export default function App() {
   const [editors, setEditors] = useState<DetectedEditor[]>([]);
   const [editorId, setEditorId] = useState<string>('');
   const [openError, setOpenError] = useState<string>('');
+  const [exportMsg, setExportMsg] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +74,17 @@ export default function App() {
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : 'No se pudo comunicar con Electron.');
       setStatus('error');
+    }
+  }
+
+  async function handleExportGraph() {
+    if (!result) return;
+    setExportMsg('');
+    const response = await window.codeatlas.exportGraph(result.graph);
+    if (response.ok) {
+      if (response.path) setExportMsg(`Grafo guardado en ${response.path}`);
+    } else {
+      setExportMsg(response.error);
     }
   }
 
@@ -152,8 +164,10 @@ export default function App() {
                   </select>
                 </div>
               )}
+              <button className="ghost-btn" onClick={handleExportGraph}>Exportar grafo</button>
             </div>
             {openError && <p className="open-error">{openError}</p>}
+            {exportMsg && <p className={`export-msg${exportMsg.startsWith('Grafo guardado') ? '' : ' export-msg-error'}`}>{exportMsg}</p>}
             <GraphView
               key={result.scannedAt}
               graph={result.graph}
@@ -260,6 +274,7 @@ function GraphOverview({ graph }: { graph: ArchitectureGraph }) {
           <div className="graph-relation-list">
             {edgeTypes.map(({ type, label }) => {
               const count = graph.edges.filter((edge) => edge.type === type).length;
+
               return (
                 <div key={type} className="graph-relation-count">
                   <span>{label}</span>

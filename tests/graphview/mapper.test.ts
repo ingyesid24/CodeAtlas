@@ -6,7 +6,9 @@ import {
   edgeClassName,
   edgeColor,
   edgeSecondaryText,
+  filterGraphByQuery,
   filterGraphByType,
+  matchesNodeQuery,
   nodeClassName,
   nodeColor,
   nodeDetailRows,
@@ -142,6 +144,45 @@ describe('filterGraphByType', () => {
     const filtered = filterGraphByType(makeGraph(), new Set());
     expect(filtered.nodes).toHaveLength(0);
     expect(filtered.edges).toHaveLength(0);
+  });
+});
+
+describe('matchesNodeQuery / filterGraphByQuery', () => {
+  it('una consulta vacía coincide con todos los nodos', () => {
+    expect(matchesNodeQuery(fileA, '')).toBe(true);
+    expect(matchesNodeQuery(fileA, '   ')).toBe(true);
+  });
+
+  it('coincide por label sin distinguir mayúsculas', () => {
+    expect(matchesNodeQuery(fileA, 'A.JS')).toBe(true);
+    expect(matchesNodeQuery(envNode, 'port')).toBe(true);
+  });
+
+  it('coincide por detalle (ruta de archivo, ubicación de ruta, versión)', () => {
+    expect(matchesNodeQuery(fileA, 'a.js')).toBe(true);
+    expect(matchesNodeQuery(routeNode, 'health')).toBe(true);
+    expect(matchesNodeQuery(packageNode, '1.0.0')).toBe(true);
+  });
+
+  it('no coincide si el término no aparece en label ni detalle', () => {
+    expect(matchesNodeQuery(depNode, 'nonexistent')).toBe(false);
+  });
+
+  it('filtra nodos por consulta y conserva edges entre nodos visibles', () => {
+    const filtered = filterGraphByQuery(makeGraph(), 'b.js');
+    expect(filtered.nodes.map((n) => n.id)).toEqual(['file:b.js']);
+    expect(filtered.edges).toHaveLength(0);
+  });
+
+  it('una consulta sin coincidencias devuelve un grafo vacío', () => {
+    const filtered = filterGraphByQuery(makeGraph(), 'nada-que-ver');
+    expect(filtered.nodes).toHaveLength(0);
+    expect(filtered.edges).toHaveLength(0);
+  });
+
+  it('con consulta vacía devuelve el grafo sin cambios (misma referencia)', () => {
+    const graph = makeGraph();
+    expect(filterGraphByQuery(graph, '')).toBe(graph);
   });
 });
 

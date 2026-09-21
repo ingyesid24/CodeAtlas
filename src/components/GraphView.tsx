@@ -21,6 +21,7 @@ import {
   connectedEdges,
   edgeClassName,
   edgeSecondaryText,
+  filterGraphByQuery,
   filterGraphByType,
   nodeClassName,
   nodeColor,
@@ -91,6 +92,41 @@ function TypeToggleBar({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function SearchBar({
+  query,
+  matchCount,
+  onQueryChange,
+  onClear
+}: {
+  query: string;
+  matchCount: number;
+  onQueryChange: (query: string) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="graph-search">
+      <input
+        type="search"
+        className="graph-search-input"
+        placeholder="Buscar archivo, ruta, paquete…"
+        value={query}
+        onChange={(event) => onQueryChange(event.target.value)}
+        aria-label="Buscar en el mapa"
+      />
+      {query && (
+        <button className="graph-search-clear" onClick={onClear} title="Limpiar búsqueda">
+          ✕
+        </button>
+      )}
+      {query && (
+        <span className="graph-search-count muted">
+          {matchCount} nodo{matchCount === 1 ? '' : 's'}
+        </span>
+      )}
     </div>
   );
 }
@@ -176,8 +212,12 @@ function MapSection({ graph, openAction }: { graph: ArchitectureGraph; openActio
   const [visibleTypes, setVisibleTypes] = useState<Set<GraphNode['type']>>(
     () => new Set(ALL_NODE_TYPES.filter((type) => !DEFAULT_HIDDEN_TYPES.includes(type)))
   );
+  const [query, setQuery] = useState('');
 
-  const filteredGraph = useMemo(() => filterGraphByType(graph, visibleTypes), [graph, visibleTypes]);
+  const filteredGraph = useMemo(
+    () => filterGraphByQuery(filterGraphByType(graph, visibleTypes), query),
+    [graph, visibleTypes, query]
+  );
   const initial = useMemo(() => buildFlowGraph(filteredGraph), [filteredGraph]);
   const [nodes, setNodes, onNodesChange] = useNodesState(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
@@ -249,10 +289,20 @@ function MapSection({ graph, openAction }: { graph: ArchitectureGraph; openActio
         )}
       </aside>
       <div className="graph-map-main">
-        <TypeToggleBar graph={graph} visibleTypes={visibleTypes} onToggle={toggleType} />
+        <div className="graph-map-toolbar">
+          <SearchBar
+            query={query}
+            matchCount={filteredGraph.nodes.length}
+            onQueryChange={setQuery}
+            onClear={() => setQuery('')}
+          />
+          <TypeToggleBar graph={graph} visibleTypes={visibleTypes} onToggle={toggleType} />
+        </div>
         {initial.nodes.length === 0 ? (
           <p className="muted graph-map-empty-filter">
-            Ningún tipo de nodo visible. Activa alguno arriba para ver el mapa.
+            {query.trim()
+              ? 'Ningún nodo coincide con la búsqueda. Limpia el término o activa más tipos arriba.'
+              : 'Ningún tipo de nodo visible. Activa alguno arriba para ver el mapa.'}
           </p>
         ) : (
           <div className="graph-map">

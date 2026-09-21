@@ -274,6 +274,32 @@ html, body, #root {
   margin: 10px 0 0;
 }
 
+.ghost-btn {
+  background: transparent;
+  color: var(--parchment);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.ghost-btn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.export-msg {
+  color: var(--teal);
+  font-size: 12.5px;
+  margin: 10px 0 0;
+  word-break: break-all;
+}
+.export-msg-error {
+  color: var(--coral);
+}
+
 .node-details-open {
   width: 100%;
   background: var(--gold);
@@ -642,4 +668,66 @@ html, body, #root {
 .graph-map-empty-filter {
   padding: 40px 0;
   text-align: center;
+}
+
+.graph-map-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.graph-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.graph-search-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 12px;
+  color: var(--parchment);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+}
+
+.graph-search-input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.graph-search-input::placeholder {
+  color: var(--muted);
+}
+
+.graph-search-clear {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.graph-search-clear:hover {
+  color: var(--parchment);
+  border-color: var(--gold);
+}
+
+.graph-search-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  white-space: nowrap;
 }

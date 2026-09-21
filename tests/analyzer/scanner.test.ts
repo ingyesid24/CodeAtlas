@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { findPackageJsonFiles, scanDirectory } from '../../src/analyzer/scanner';
+import {
+  collectSourceFiles,
+  findPackageJsonFiles,
+  MAX_SOURCE_FILE_BYTES,
+  scanDirectory
+} from '../../src/analyzer/scanner';
 import { cleanupTempProject, createTempProject, type FixtureTree } from '../helpers/tmpProject';
 
 let currentProject: string | null = null;
@@ -104,6 +109,35 @@ describe('scanDirectory', () => {
     } finally {
       fs.chmodSync(blockedPath, 0o700);
     }
+  });
+});
+
+describe('collectSourceFiles', () => {
+  it('recolecta solo extensiones de código fuente', () => {
+    const root = setup({
+      'index.ts': '',
+      'app.jsx': '',
+      'notes.md': '',
+      'data.json': '{}'
+    });
+
+    const files = collectSourceFiles(root).map((file) => file.relPath).sort();
+
+    expect(files).toEqual(['app.jsx', 'index.ts']);
+  });
+
+  it('omite archivos fuente más grandes que el límite (bundles minificados)', () => {
+    const oversized = 'x'.repeat(MAX_SOURCE_FILE_BYTES + 1);
+    const root = setup({
+      src: {
+        'index.ts': '',
+        'bundle.min.js': oversized
+      }
+    });
+
+    const files = collectSourceFiles(root).map((file) => file.relPath);
+
+    expect(files).toEqual(['src/index.ts']);
   });
 });
 

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AnalysisProgress, AnalysisResult } from '../src/analyzer/types';
+import type { AnalysisProgress, AnalysisResult, ArchitectureGraph } from '../src/analyzer/types';
 
 export interface DetectedEditor {
   id: string;
@@ -27,6 +27,9 @@ export interface CodeAtlasAPI {
   openInEditor: (request: OpenInEditorRequest) => Promise<
     { ok: true } | { ok: false; error: string }
   >;
+  exportGraph: (graph: ArchitectureGraph) => Promise<
+    { ok: true; path: string | null } | { ok: false; error: string }
+  >;
 }
 
 const api: CodeAtlasAPI = {
@@ -45,7 +48,8 @@ const api: CodeAtlasAPI = {
     });
   },
   detectEditors: () => ipcRenderer.invoke('detect-editors'),
-  openInEditor: (request: OpenInEditorRequest) => ipcRenderer.invoke('open-in-editor', request)
+  openInEditor: (request: OpenInEditorRequest) => ipcRenderer.invoke('open-in-editor', request),
+  exportGraph: (graph: ArchitectureGraph) => ipcRenderer.invoke('export-graph', graph)
 };
 
 contextBridge.exposeInMainWorld('codeatlas', api);

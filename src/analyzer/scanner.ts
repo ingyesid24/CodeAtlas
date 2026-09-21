@@ -11,6 +11,13 @@ const IGNORED_DIRS = new Set([
 /** Extensiones de código fuente que interesan a los detectores. */
 export const SOURCE_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs']);
 
+/**
+ * Tamaño máximo (en bytes) de un archivo fuente que se analiza. Los archivos
+ * más grandes suelen ser bundles minificados o código generado: el análisis
+ * regex sobre ellos es lento y su ruido no aporta a la arquitectura.
+ */
+export const MAX_SOURCE_FILE_BYTES = 512 * 1024;
+
 export interface SourceFile {
   /** Ruta absoluta al archivo. */
   fullPath: string;
@@ -43,8 +50,15 @@ export function collectSourceFiles(rootPath: string): SourceFile[] {
       if (!entry.isFile()) continue;
       if (!SOURCE_EXTENSIONS.has(path.extname(entry.name))) continue;
 
+      const fullPath = path.join(currentPath, entry.name);
+      try {
+        if (fs.statSync(fullPath).size > MAX_SOURCE_FILE_BYTES) continue;
+      } catch {
+        continue; // archivo ilegible — lo saltamos sin romper el escaneo
+      }
+
       files.push({
-        fullPath: path.join(currentPath, entry.name),
+        fullPath,
         relPath: path.join(relativePath, entry.name)
       });
     }

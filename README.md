@@ -2,23 +2,25 @@
 
 > Understand any codebase in minutes.
 
-CodeAtlas es una aplicación de escritorio que analiza proyectos locales y presenta su estructura y señales arquitectónicas en una interfaz navegable. La versión `0.1` se concentra en proyectos JavaScript y TypeScript.
+CodeAtlas es una aplicación de escritorio que analiza proyectos locales y presenta su estructura y señales arquitectónicas en una interfaz navegable. La versión `1.1` se concentra en proyectos JavaScript y TypeScript.
 
 ## Versión, fase y descargas
 
 | Campo          | Valor                                                  |
 | -------------- | ------------------------------------------------------ |
-| **Versión**    | `0.1.0` (`package.json`) — visible en la barra de la app |
-| **Fase**       | MVP (v0.1) · desarrollo activo                         |
+| **Versión**    | `1.1.0` (`package.json`) — visible en la barra de la app |
+| **Fase**       | v1.1 · estabilidad y adopción                          |
 | **Licencia**   | MIT                                                    |
 
 ### Plataformas disponibles
 
-| Sistema operativo | Artefacto                                   |
-| ----------------- | ------------------------------------------- |
-| Linux             | `.AppImage` (y `.snap`)                     |
-| Windows           | Instalador `.exe` (NSIS) y portable `.exe`  |
-| macOS             | `.dmg` y `.zip`                             |
+| Sistema operativo | Artefacto en GitHub Releases               | Build local (`npm run electron:build`) |
+| ----------------- | ------------------------------------------ | -------------------------------------- |
+| Linux             | `.AppImage`                                | `.AppImage` y `.snap`                  |
+| Windows           | Instalador `.exe` (NSIS) y portable `.exe` | `.exe` (NSIS y portable)               |
+| macOS             | `.dmg` y `.zip`                            | `.dmg` y `.zip`                        |
+
+El CI publica `.AppImage` en Linux porque el `.snap` requiere `snapcraft`; localmente sí se genera con `npm run electron:build`.
 
 ### Descargar
 
@@ -28,14 +30,21 @@ Los binarios se generan automáticamente con GitHub Actions al crear un tag `v*`
 
 ## Estado actual
 
-El MVP incluye:
+La v1.1 incluye (además de todo el MVP):
+
+- Toggle de tipos de nodo en el mapa (ocultar `dependency` por defecto).
+- Búsqueda de nodos por nombre, ruta o detalle con recuento de coincidencias.
+- Exportación del grafo arquitectónico a un archivo JSON (`Exportar grafo`).
+- Límite de tamaño para archivos fuente: los bundles de más de 512 KB se omiten del análisis para no degradar el rendimiento en proyectos grandes.
+
+El núcleo del MVP incluye:
 
 - Electron, React, TypeScript y Vite.
 - Selección segura de un repositorio local mediante IPC.
 - Árbol de archivos con exclusión de dependencias y artefactos de build.
 - Detección y parseo de `package.json`.
 - Detección de usos de `process.env`.
-- Detección heurística de rutas Express y NestJS (decoradores `@Controller`/`@Get`/`@Post` y similares), con método, ruta completa, archivo y línea. Sus límites se documentan en la sección [Límites de los detectores heurísticos](#límites-de-los-detectores-heurísticos-v01).
+- Detección heurística de rutas Express y NestJS (decoradores `@Controller`/`@Get`/`@Post` y similares), con método, ruta completa, archivo y línea. Sus límites se documentan en la sección [Límites de los detectores heurísticos](#límites-de-los-detectores-heurísticos-v11).
 - Detección de imports y `require`, resolviendo rutas relativas entre módulos.
 - Modelo de grafo común para archivos, rutas, variables, paquetes y dependencias.
 - Mapa interactivo con React Flow: pan, zoom, minimapa y nodos coloreados por tipo.
@@ -45,7 +54,7 @@ El MVP incluye:
 - Análisis en un `worker_threads` dedicado: Electron nunca se congela y la interfaz muestra una barra de progreso con fases y porcentaje en vivo.
 - Suite automatizada del analizador con Vitest.
 
-## Límites de los detectores heurísticos (v0.1)
+## Límites de los detectores heurísticos (v1.1)
 
 Los detectores del analizador son **heurísticos basados en expresiones regulares**, no en un AST real: pueden arrojar falsos positivos y falsos negativos. Son útiles para orientarse en un proyecto desconocido, no para auditorías exhaustivas. La suite de pruebas cubre los comportamientos descritos aquí.
 
@@ -90,11 +99,51 @@ Detecta `import`, `export ... from`, `import(...)` y `require(...)` con comillas
 - Lista fija de carpetas ignoradas (`node_modules`, `.git`, `dist`, `build`…): carpetas de dependencias con otros nombres sí se escanean.
 - No sigue symlinks: módulos montados por symlink quedan fuera del análisis.
 - Los archivos ocultos se omiten salvo `.env`.
+- Los archivos fuente de más de 512 KB (`MAX_SOURCE_FILE_BYTES`) se omiten del análisis de rutas, variables e imports (suelen ser bundles minificados). El árbol de archivos sí los sigue mostrando.
 - El análisis es un snapshot estático: no hay watch ni análisis incremental.
 
 ### Alcance
 
-- v0.1 analiza únicamente proyectos JavaScript y TypeScript.
+- v1.1 analiza únicamente proyectos JavaScript y TypeScript.
+
+## Formato del grafo (`ArchitectureGraph`)
+
+`ArchitectureGraph` es un modelo de dominio serializable, independiente de React Flow, con `schemaVersion: 1`:
+
+```ts
+interface ArchitectureGraph {
+  schemaVersion: 1;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+```
+
+### Nodos (`GraphNode`)
+
+| Tipo           | Campos propios                                          |
+| -------------- | ------------------------------------------------------- |
+| `file`         | `path` (ruta relativa)                                  |
+| `route`        | `method`, `routePath`, `location { file, line? }`       |
+| `environment`  | `name`                                                  |
+| `package`      | `name`, `version?`, `manifestPath`                      |
+| `dependency`   | `name`                                                  |
+
+Todos los nodos tienen `id` estable (normalizado por ruta, ver `normalizeGraphPath`) y `label` legible. Los IDs son estables entre sistemas operativos: el mismo proyecto analizado en Windows, Linux o macOS produce el mismo grafo.
+
+### Aristas (`GraphEdge`)
+
+| Tipo             | Campos propios                          | Significado                                  |
+| ---------------- | --------------------------------------- | -------------------------------------------- |
+| `imports`        | `specifier`, `location?`                | archivo → archivo/dependencia                |
+| `declares-route` | `location { file, line? }`              | archivo → ruta                               |
+| `uses-env`       | —                                       | archivo → variable de entorno                |
+| `depends-on`     | `scope: 'runtime' \| 'development'`, `version` | package → dependencia                |
+
+Todas las aristas tienen `id`, `source` y `target` (IDs de nodo).
+
+### Exportación
+
+El grafo se exporta desde la app (`Exportar grafo`) como JSON válido de este formato, listo para consumo externo o tests.
 
 ## Requisitos
 
@@ -137,6 +186,9 @@ La cobertura funcional actual incluye:
 - Integración completa mediante `analyzeProject()`.
 - Progreso del análisis: fases, avance por archivo y rango monótono [0, 1].
 - Mapeo visual: ids estables, posiciones deterministas, regiones por tipo y colores.
+- Toggle de tipos: filtrado sin mutar el grafo original y conservación de aristas.
+- Búsqueda: coincidencia por label y detalle, insensible a mayúsculas, y conservación de aristas.
+- Límite de tamaño de archivos fuente en `collectSourceFiles`.
 
 Antes de proponer un cambio ejecuta:
 

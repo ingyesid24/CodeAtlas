@@ -287,3 +287,50 @@ ipcMain.handle('open-in-editor', async (_event, request: unknown) => {
     return { ok: false, error: errorMessage(error) };
   }
 });
+
+// --- Exportar el grafo a un archivo JSON ---
+
+/**
+ * Valida que el payload recibido sea un grafo serializable y devuelve una
+ * copia limpia (solo schemaVersion/nodes/edges) para no escribir de más.
+ */
+function sanitizeGraph(graph: unknown): import('../src/analyzer/types').ArchitectureGraph | null {
+  if (typeof graph !== 'object' || graph === null) return null;
+  const candidate = graph as { schemaVersion?: unknown; nodes?: unknown; edges?: unknown };
+  if (candidate.schemaVersion !== 1 || !Array.isArray(candidate.nodes) || !Array.isArray(candidate.edges)) {
+    return null;
+  }
+  return {
+    schemaVersion: 1,
+    nodes: candidate.nodes,
+    edges: candidate.edges
+  };
+}
+
+ipcMain.handle('export-graph', async (event, graph: unknown) => {
+  try {
+    if (!mainWindow) {
+      return { ok: false, error: 'La ventana principal no está disponible.' };
+    }
+
+    const clean = sanitizeGraph(graph);
+    if (!clean) {
+      return { ok: false, error: 'El grafo recibido no es válido.' };
+    }
+
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Exportar grafo de CodeAtlas',
+      defaultPath: path.join(app.getPath('documents'), 'codeatlas-graph.json'),
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { ok: true, path: null };
+    }
+
+    await fs.promises.writeFile(result.filePath, JSON.stringify(clean, null, 2), 'utf-8');
+    return { ok: true, path: result.filePath };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+});

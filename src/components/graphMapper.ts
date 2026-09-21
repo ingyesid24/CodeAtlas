@@ -30,6 +30,36 @@ export function filterGraphByType(
     return { schemaVersion: graph.schemaVersion, nodes, edges };
 }
 
+/**
+ * Devuelve true si el término de búsqueda (insensible a mayúsculas) aparece
+ * en el label del nodo o en su detalle (ruta de archivo, nombre, método…).
+ */
+export function matchesNodeQuery(node: GraphNode, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (needle === '') return true;
+  const haystack = `${node.label} ${nodeDetail(node)}`.toLowerCase();
+  return haystack.includes(needle);
+}
+
+/**
+ * Grafo filtrado por término de búsqueda: conserva solo los nodos cuyo
+ * label o detalle coincide, y las edges entre nodos aún visibles. Un
+ * término vacío devuelve el grafo sin cambios.
+ */
+export function filterGraphByQuery(
+  graph: ArchitectureGraph,
+  query: string
+): ArchitectureGraph {
+  const needle = query.trim();
+  if (needle === '') return graph;
+  const nodes = graph.nodes.filter((node) => matchesNodeQuery(node, needle));
+  const visibleIds = new Set(nodes.map((node) => node.id));
+  const edges = graph.edges.filter(
+    (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target)
+  );
+  return { schemaVersion: graph.schemaVersion, nodes, edges };
+}
+
 const EDGE_COLORS: Record<GraphEdge['type'], string> = {
   'declares-route': '#C9A15A',
   'uses-env': '#D97757',
