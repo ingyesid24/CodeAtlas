@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AnalysisProgress, AnalysisResult, ArchitectureGraph, GraphEdge, GraphNode, RouteInfo } from './analyzer/types';
-import type { DetectedEditor } from '../electron/preload';
+import type { DetectedEditor, UpdateStatus } from '../electron/preload';
 import TreeView from './components/TreeView';
 import GraphView from './components/GraphView';
 import { EDGE_TYPE_LABELS } from './components/graphLabels';
@@ -19,6 +19,33 @@ export default function App() {
   const [editorId, setEditorId] = useState<string>('');
   const [openError, setOpenError] = useState<string>('');
   const [exportMsg, setExportMsg] = useState<string>('');
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
+
+  useEffect(() => {
+    return window.codeatlas.onUpdateStatus(setUpdateStatus);
+  }, []);
+
+  // El aviso "estás al día" desaparece solo.
+  useEffect(() => {
+    if (updateStatus?.type !== 'not-available') return;
+    const timer = setTimeout(() => setUpdateStatus(null), 6000);
+    return () => clearTimeout(timer);
+  }, [updateStatus]);
+
+  async function handleCheckUpdates() {
+    setUpdateStatus({ type: 'checking' });
+    const response = await window.codeatlas.checkForUpdates();
+    if (!response.ok) setUpdateStatus({ type: 'error', error: response.error });
+  }
+
+  async function handleDownloadUpdate() {
+    const response = await window.codeatlas.downloadUpdate();
+    if (!response.ok) setUpdateStatus({ type: 'error', error: response.error });
+  }
+
+  async function handleInstallUpdate() {
+    await window.codeatlas.installUpdate();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -93,10 +120,25 @@ export default function App() {
       <header className="app-header">
         <div className="eyebrow">CodeAtlas · v{pkg.version}</div>
         <h1>Understand any codebase in minutes.</h1>
-        <button className="primary-btn" onClick={handleSelectFolder} disabled={status === 'scanning'}>
-          {status === 'scanning' ? 'Escaneando…' : 'Seleccionar proyecto'}
-        </button>
+        <div className="app-header-actions">
+          <button className="ghost-btn" onClick={handleCheckUpdates} title="Buscar una versión más reciente de CodeAtlas">
+            Buscar actualizaciones
+          </button>
+          <button className="primary-btn" onClick={handleSelectFolder} disabled={status === 'scanning'}>
+            {status === 'scanning' ? 'Escaneando…' : 'Seleccionar proyecto'}
+          </button>
+        </div>
       </header>
+
+      {updateStatus && (
+        <UpdateBanner
+          status={updateStatus}
+          currentVersion={pkg.version}
+          onDownload={handleDownloadUpdate}
+          onInstall={handleInstallUpdate}
+          onDismiss={() => setUpdateStatus(null)}
+        />
+      )}
 
       {status === 'scanning' && (
         <div className="progress-panel">
@@ -299,6 +341,77 @@ function GraphOverview({ graph }: { graph: ArchitectureGraph }) {
         </div>
       )}
     </section>
+  );
+}
+
+function UpdateBanner({
+  status,
+  currentVersion,
+  onDownload,
+  onInstall,
+  onDismiss
+}: {
+  status: UpdateStatus;
+  currentVersion: string;
+  onDownload: () => void;
+  onInstall: () => void;
+  onDismiss: () => void;
+}) {
+  if (status.type === 'checking') {
+    return <div className="update-banner muted">Buscando actualizaciones…</div>;
+  }
+
+  if (status.type === 'available') {
+    return (
+      <div className="update-banner update-banner-available">
+        <div className="update-banner-text">
+          <strong>Nueva versión disponible: v{status.version}</strong>
+          <span className="muted">Actualmente tienes v{currentVersion}.</span>
+        </div>
+        <div className="update-banner-actions">
+          <button className="primary-btn update-btn" onClick={onDownload}>Descargar actualización</button>
+          <button className="ghost-btn" onClick={onDismiss}>Más tarde</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status.type === 'progress') {
+    return (
+      <div className="update-banner">
+        <div className="update-banner-text">
+          <strong>Descargando actualización… {Math.round(status.percent)}%</strong>
+        </div>
+        <div className="progress-track update-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(status.percent)}>
+          <div className="progress-fill" style={{ width: `${status.percent}%` }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (status.type === 'downloaded') {
+    return (
+      <div className="update-banner update-banner-available">
+        <div className="update-banner-text">
+          <strong>Actualización v{status.version} lista para instalar.</strong>
+        </div>
+        <div className="update-banner-actions">
+          <button className="primary-btn update-btn" onClick={onInstall}>Reiniciar e instalar</button>
+          <button className="ghost-btn" onClick={onDismiss}>Más tarde</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status.type === 'not-available') {
+    return <div className="update-banner">Ya tienes la última versión (v{currentVersion}).</div>;
+  }
+
+  return (
+    <div className="update-banner update-banner-error">
+      <span>No se pudo comprobar la actualización: {status.error}</span>
+      <button className="ghost-btn" onClick={onDismiss}>Cerrar</button>
+    </div>
   );
 }
 

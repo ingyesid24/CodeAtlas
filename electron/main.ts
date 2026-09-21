@@ -4,7 +4,9 @@ import { Worker } from 'worker_threads';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { autoUpdater } from 'electron-updater';
 import type { AnalysisProgress } from '../src/analyzer/types';
+import type { UpdateStatus } from './preload';
 import {
   buildEditorCommand,
   buildEditorDeepLink,
@@ -17,6 +19,48 @@ const isDev = process.env.NODE_ENV === 'development';
 let mainWindow: BrowserWindow | null = null;
 
 const analysisWorkers = new Set<Worker>();
+
+// --- Actualizaciones automáticas (solo en app empaquetada) ---
+
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+function sendUpdateStatus(status: UpdateStatus) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-status', status);
+  }
+}
+
+function wireUpdaterEvents() {
+  autoUpdater.on('checking-for-update', () => {
+    sendUpdateStatus({ type: 'checking' });
+  });
+  autoUpdater.on('update-available', (info) => {
+    sendUpdateStatus({
+      type: 'available',
+      version: info.version,
+      releaseDate: info.releaseDate,
+      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined
+    });
+  });
+  autoUpdater.on('update-not-available', () => {
+    sendUpdateStatus({ type: 'not-available' });
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    sendUpdateStatus({
+      type: 'progress',
+      percent: progress.percent,
+      transferred: progress.transferred,
+      total: progress.total
+    });
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    sendUpdateStatus({ type: 'downloaded', version: info.version });
+  });
+  autoUpdater.on('error', (error) => {
+    sendUpdateStatus({ type: 'error', error: errorMessage(error) });
+  });
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -113,6 +157,16 @@ function ensureDesktopIntegration() {
 app.whenReady().then(() => {
   ensureDesktopIntegration();
   createWindow();
+  wireUpdaterEvents();
+
+  // Comprobación silenciosa al arranque: no molesta y avisa si hay una
+  // versión nueva. Solo aplica a binarios empaquetados (en desarrollo
+  // electron-updater no tiene app-update.yml).
+  if (app.isPackaged) {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch(() => undefined);
+    }, 10_000);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -283,6 +337,44 @@ ipcMain.handle('open-in-editor', async (_event, request: unknown) => {
     }
 
     return { ok: false, error: 'El editor seleccionado no está disponible en este sistema.' };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+});
+
+// --- Actualizaciones: IPC ---
+
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    if (!app.isPackaged) {
+      return { ok: false, error: 'La comprobación de actualizaciones solo está disponible en la app instalada.' };
+    }
+    await autoUpdater.checkForUpdates();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+});
+
+ipcMain.handle('download-update', async () => {
+  try {
+    if (!app.isPackaged) {
+      return { ok: false, error: 'La descarga de actualizaciones solo está disponible en la app instalada.' };
+    }
+    await autoUpdater.downloadUpdate();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+});
+
+ipcMain.handle('install-update', async () => {
+  try {
+    if (!app.isPackaged) {
+      return { ok: false, error: 'La instalación de actualizaciones solo está disponible en la app instalada.' };
+    }
+    autoUpdater.quitAndInstall();
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
   }

@@ -4,6 +4,24 @@ Todas las versiones notables de CodeAtlas se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y el versionado es [SemVer](https://semver.org/lang/es/).
 
+## [1.2.0] - 2026-09-21
+
+Fase: actualizaciones automáticas.
+
+### Añadido
+
+- Sistema de actualizaciones con `electron-updater` y GitHub Releases como proveedor.
+- Comprobación automática de nuevas versiones al iniciar la app (solo binarios empaquetados).
+- Notificación dentro de la app cuando hay una versión nueva: versión disponible, versión actual y botones "Descargar actualización" / "Más tarde".
+- Progreso de descarga en tiempo real.
+- Aviso "Reiniciar e instalar" cuando la descarga termina.
+- Comprobación manual con el botón "Buscar actualizaciones" en la cabecera.
+- Publicación de metadatos de actualización (`latest*.yml` y `*.blockmap`) en GitHub Releases para que `electron-updater` pueda detectar versiones nuevas en Linux (AppImage), Windows (NSIS) y macOS (zip).
+
+### Nota para usuarios de v0.1
+
+Las versiones anteriores a 1.2.0 no tienen el actualizador integrado: si tienes instalado v0.1/v1.1, instala una vez manualmente la v1.2.0 desde GitHub Releases. A partir de esa versión las futuras actualizaciones se notificarán automáticamente dentro de la app.
+
 ## [1.1.0] - 2026-09-21
 
 Fase: estabilidad y adopción.
@@ -52,5 +70,6 @@ MVP: analizador JavaScript/TypeScript y aplicación Electron.
 - Suite automatizada del analizador con Vitest.
 - Workflow de GitHub Actions para compilar Linux, Windows y macOS y publicar releases al crear un tag `v*`.
 
+[1.2.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.2.0
 [1.1.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.1.0
 [0.1.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v0.1.0

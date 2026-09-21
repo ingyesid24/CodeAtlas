@@ -8,8 +8,8 @@ CodeAtlas es una aplicación de escritorio que analiza proyectos locales y prese
 
 | Campo          | Valor                                                  |
 | -------------- | ------------------------------------------------------ |
-| **Versión**    | `1.1.0` (`package.json`) — visible en la barra de la app |
-| **Fase**       | v1.1 · estabilidad y adopción                          |
+| **Versión**    | `1.2.0` (`package.json`) — visible en la barra de la app |
+| **Fase**       | v1.2 · actualizaciones automáticas                     |
 | **Licencia**   | MIT                                                    |
 
 ### Plataformas disponibles
@@ -26,9 +26,20 @@ El CI publica `.AppImage` en Linux porque el `.snap` requiere `snapcraft`; local
 
 Los binarios se generan automáticamente con GitHub Actions al crear un tag `v*` y se publican en [GitHub Releases](https://github.com/ingyesid24/CodeAtlas/releases). Descarga el artefacto de tu sistema operativo en la última release.
 
+> Desde la v1.2.0 la app comprueba actualizaciones automáticamente y avisa dentro de la interfaz cuando hay una versión nueva. Las versiones anteriores deben actualizarse manualmente una vez.
+
 > Los binarios no están firmados: en Windows el SmartScreen y en macOS Gatekeeper mostrarán una advertencia al primer arranque (se salta con "Más información → Ejecutar de todas formas" / clic derecho → Abrir).
 
 ## Estado actual
+
+La v1.2 añade actualizaciones automáticas:
+
+- Comprobación de nuevas versiones al iniciar la app (via `electron-updater` y GitHub Releases).
+- Notificación con versión nueva, botón "Descargar actualización" y progreso de descarga.
+- Aviso "Reiniciar e instalar" al terminar la descarga.
+- Botón "Buscar actualizaciones" en la cabecera para comprobación manual.
+
+> **Usuarios con v0.1/v1.1:** esas versiones no incluyen el actualizador. Instala una vez manualmente la v1.2.0 desde GitHub Releases; desde esa versión las futuras actualizaciones se notificarán solas.
 
 La v1.1 incluye (además de todo el MVP):
 

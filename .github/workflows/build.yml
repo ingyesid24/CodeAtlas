@@ -64,6 +64,14 @@ jobs:
           name: codeatlas-${{ matrix.artifact }}
           path: ${{ matrix.glob }}
           if-no-files-found: error
+      - name: Upload update metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeatlas-${{ matrix.artifact }}-metadata
+          path: |
+            release/latest*.yml
+            release/*.blockmap
+          if-no-files-found: warn
 
   release:
     needs: build

@@ -13,6 +13,14 @@ export interface OpenInEditorRequest {
   line?: number;
 }
 
+export type UpdateStatus =
+  | { type: 'checking' }
+  | { type: 'available'; version: string; releaseDate?: string; releaseNotes?: string }
+  | { type: 'not-available' }
+  | { type: 'progress'; percent: number; transferred: number; total: number }
+  | { type: 'downloaded'; version: string }
+  | { type: 'error'; error: string };
+
 export interface CodeAtlasAPI {
   selectFolder: () => Promise<
     { ok: true; path: string | null } | { ok: false; error: string }
@@ -30,6 +38,10 @@ export interface CodeAtlasAPI {
   exportGraph: (graph: ArchitectureGraph) => Promise<
     { ok: true; path: string | null } | { ok: false; error: string }
   >;
+  onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void;
+  checkForUpdates: () => Promise<{ ok: true } | { ok: false; error: string }>;
+  downloadUpdate: () => Promise<{ ok: true } | { ok: false; error: string }>;
+  installUpdate: () => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
 const api: CodeAtlasAPI = {
@@ -49,7 +61,17 @@ const api: CodeAtlasAPI = {
   },
   detectEditors: () => ipcRenderer.invoke('detect-editors'),
   openInEditor: (request: OpenInEditorRequest) => ipcRenderer.invoke('open-in-editor', request),
-  exportGraph: (graph: ArchitectureGraph) => ipcRenderer.invoke('export-graph', graph)
+  exportGraph: (graph: ArchitectureGraph) => ipcRenderer.invoke('export-graph', graph),
+  onUpdateStatus: (callback: (status: UpdateStatus) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: UpdateStatus) => {
+      callback(status);
+    };
+    ipcRenderer.on('update-status', listener);
+    return () => ipcRenderer.removeListener('update-status', listener);
+  },
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update')
 };
 
 contextBridge.exposeInMainWorld('codeatlas', api);
