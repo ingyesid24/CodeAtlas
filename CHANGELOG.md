@@ -4,6 +4,20 @@ Todas las versiones notables de CodeAtlas se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y el versionado es [SemVer](https://semver.org/lang/es/).
 
+## [1.4.0] - 2026-09-21
+
+Expansión JVM: soporte para proyectos Java y Kotlin.
+
+### Añadido
+
+- Detección de proyectos Maven (`pom.xml`) y Gradle (`build.gradle` / `build.gradle.kts`) con sus dependencias (`groupId:artifactId:version`) y scope.
+- Imports Java y Kotlin: resueltos a las clases locales del propio proyecto (convención Java: nombre de archivo = nombre de clase); los imports de la JDK y de librerías externas se conservan sin resolver.
+- Controladores Spring Boot: `@RestController`, `@Controller`, `@RequestMapping` (prefijo y de método), `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping`, en Java y Kotlin.
+- Archivos `.java` y `.kt` en el árbol de archivos y como nodos `file` en el grafo; imports locales como aristas `imports`.
+- Proyectos y dependencias JVM como nodos `package`/`dependency` con aristas `depends-on` (scope `test` → `development`).
+- Panel "Proyectos JVM detectados" en la interfaz.
+- Pruebas unitarias y de integración para los detectores JVM y el grafo.
+
 ## [1.3.2] - 2026-09-21
 
 Hotfix: dependencia de producción para el parser AST.
@@ -123,6 +137,7 @@ MVP: analizador JavaScript/TypeScript y aplicación Electron.
 - Suite automatizada del analizador con Vitest.
 - Workflow de GitHub Actions para compilar Linux, Windows y macOS y publicar releases al crear un tag `v*`.
 
+[1.4.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.4.0
 [1.3.2]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.3.2
 [1.3.1]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.3.1
 [1.3.0]: https://github.com/ingyesid24/CodeAtlas/releases/tag/v1.3.0

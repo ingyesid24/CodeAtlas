@@ -8,6 +8,7 @@ import type {
   GraphEdge,
   GraphNode,
   ImportInfo,
+  JvmProject,
   PackageInfo,
   RouteInfo
 } from './types';
@@ -18,6 +19,7 @@ interface GraphInput {
   envVars: EnvVarUsage[];
   routes: RouteInfo[];
   imports?: ImportInfo[];
+  jvmProjects?: JvmProject[];
 }
 
 export function normalizeGraphPath(filePath: string): string {
@@ -98,6 +100,44 @@ export function buildArchitectureGraph(input: GraphInput): ArchitectureGraph {
     }
   }
 
+  function addJvmProjects(jvmProjects: JvmProject[]): void {
+    for (const project of jvmProjects) {
+      const manifestPath = normalizeGraphPath(project.path);
+      const projectName = project.artifactId ?? project.groupId ?? manifestPath;
+      const projectId = createId('package', manifestPath);
+      addNode({
+        id: projectId,
+        type: 'package',
+        label: projectName,
+        name: projectName,
+        version: project.version,
+        manifestPath
+      });
+
+      for (const dependency of project.dependencies) {
+        const depName = `${dependency.groupId}:${dependency.artifactId}`;
+        const dependencyId = createId('dependency', depName);
+        addNode({
+          id: dependencyId,
+          type: 'dependency',
+          label: depName,
+          name: depName
+        });
+
+        const scope: DependencyScope = dependency.scope === 'test' ? 'development' : 'runtime';
+        const edgeId = createId('edge', 'depends-on', projectId, dependencyId, scope);
+        addEdge({
+          id: edgeId,
+          type: 'depends-on',
+          source: projectId,
+          target: dependencyId,
+          scope,
+          version: dependency.version ?? ''
+        });
+      }
+    }
+  }
+
   addFiles(input.tree);
 
   for (const pkg of input.packages) {
@@ -115,6 +155,8 @@ export function buildArchitectureGraph(input: GraphInput): ArchitectureGraph {
     addDependencies(packageId, pkg.dependencies, 'runtime');
     addDependencies(packageId, pkg.devDependencies, 'development');
   }
+
+  addJvmProjects(input.jvmProjects ?? []);
 
   for (const envVar of input.envVars) {
     const environmentId = createId('environment', envVar.name);

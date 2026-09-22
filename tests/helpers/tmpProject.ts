@@ -15,6 +15,7 @@ function writeTree(basePath: string, tree: FixtureTree): void {
     const fullPath = path.join(basePath, name);
 
     if (typeof value === 'string') {
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
       fs.writeFileSync(fullPath, value, 'utf-8');
       continue;
     }

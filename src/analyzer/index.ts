@@ -1,8 +1,11 @@
-import { scanDirectory, findPackageJsonFiles, collectSourceFiles } from './scanner';
+import { scanDirectory, findPackageJsonFiles, collectSourceFiles, collectJvmSourceFiles } from './scanner';
 import { scanEnvVars } from './envscan';
 import { scanExpressRoutes } from './routescan';
 import { scanNestRoutes } from './nestscan';
 import { scanImports } from './importscan';
+import { scanJvmImports } from './jvmimportscan';
+import { scanSpringRoutes } from './springscan';
+import { scanJvmProjects } from './jvmdepscan';
 import { buildArchitectureGraph } from './graph';
 import type {
   AnalysisPhase,
@@ -33,7 +36,6 @@ const PHASE_MESSAGES: Record<AnalysisPhase, string> = {
  * por subetapa.
  */
 export function analyzeProject(rootPath: string, onProgress?: ProgressCallback): AnalysisResult {
-  const sourceFiles = collectSourceFiles(rootPath);
   const phaseMax = new Map<AnalysisPhase, number>();
 
   const report = (phase: AnalysisPhase, subFraction: number, message?: string) => {
@@ -58,19 +60,29 @@ export function analyzeProject(rootPath: string, onProgress?: ProgressCallback):
 
   report('scan', 0);
   const { tree, stats } = scanDirectory(rootPath);
-  report('scan', 0.65);
+  report('scan', 0.55);
   const packages = findPackageJsonFiles(rootPath);
+  report('scan', 0.8);
+  const jvmProjects = scanJvmProjects(rootPath);
   report('scan', 1);
+
+  const sourceFiles = collectSourceFiles(rootPath);
+  const jvmSourceFiles = collectJvmSourceFiles(rootPath);
+  const jvmHasCode = jvmSourceFiles.length > 0 || jvmProjects.length > 0;
 
   const envVars = scanEnvVars(rootPath, sourceFiles, reportPerFile('env'));
   const routes = [
     ...scanExpressRoutes(rootPath, sourceFiles, reportPerFile('routes')),
-    ...scanNestRoutes(rootPath, sourceFiles, reportPerFile('routes'))
+    ...scanNestRoutes(rootPath, sourceFiles, reportPerFile('routes')),
+    ...(jvmHasCode ? scanSpringRoutes(rootPath, jvmSourceFiles, reportPerFile('routes')) : [])
   ];
-  const imports = scanImports(rootPath, sourceFiles, reportPerFile('imports'));
+  const imports = [
+    ...scanImports(rootPath, sourceFiles, reportPerFile('imports')),
+    ...(jvmHasCode ? scanJvmImports(rootPath, jvmSourceFiles, reportPerFile('imports')) : [])
+  ];
 
   report('graph', 0.5);
-  const graph = buildArchitectureGraph({ tree, packages, envVars, routes, imports });
+  const graph = buildArchitectureGraph({ tree, packages, envVars, routes, imports, jvmProjects });
   report('graph', 1);
 
   return {
@@ -83,6 +95,7 @@ export function analyzeProject(rootPath: string, onProgress?: ProgressCallback):
     envVars,
     routes,
     imports,
+    jvmProjects,
     graph
   };
 }
@@ -90,7 +103,10 @@ export function analyzeProject(rootPath: string, onProgress?: ProgressCallback):
 export { buildArchitectureGraph, createFileNodeId, normalizeGraphPath } from './graph';
 export { scanImports } from './importscan';
 export { scanNestRoutes } from './nestscan';
-export { collectSourceFiles, type SourceFile } from './scanner';
+export { scanJvmImports } from './jvmimportscan';
+export { scanSpringRoutes } from './springscan';
+export { scanJvmProjects } from './jvmdepscan';
+export { collectSourceFiles, collectJvmSourceFiles, findJvmManifestFiles, type SourceFile } from './scanner';
 export type {
   AnalysisPhase,
   AnalysisProgress,
@@ -103,6 +119,9 @@ export type {
   GraphNode,
   HttpMethod,
   ImportInfo,
+  JvmBuildTool,
+  JvmDependency,
+  JvmProject,
   PackageInfo,
   ProgressCallback,
   RouteInfo,

@@ -36,6 +36,29 @@ export interface ImportInfo {
   target?: string;    // ruta relativa resuelta solo para imports relativos
 }
 
+/** Dependencia de un manifiesto JVM (Maven o Gradle). */
+export interface JvmDependency {
+  groupId: string;
+  artifactId: string;
+  version?: string;
+  /** Alcance del manifiesto (compile, test, provided, runtime, implementation…). */
+  scope: string;
+}
+
+/** Herramienta de build usada por un proyecto JVM. */
+export type JvmBuildTool = 'maven' | 'gradle';
+
+/** Proyecto JVM detectado a partir de pom.xml o build.gradle(.kts). */
+export interface JvmProject {
+  /** Ruta relativa del manifiesto (pom.xml, build.gradle, build.gradle.kts). */
+  path: string;
+  buildTool: JvmBuildTool;
+  groupId?: string;
+  artifactId?: string;
+  version?: string;
+  dependencies: JvmDependency[];
+}
+
 export interface SourceLocation {
   file: string;
   line?: number;
@@ -133,6 +156,7 @@ export interface AnalysisResult {
   envVars: EnvVarUsage[];
   routes: RouteInfo[];
   imports: ImportInfo[];
+  jvmProjects: JvmProject[];
   graph: ArchitectureGraph;
 }
 

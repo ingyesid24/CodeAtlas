@@ -2,14 +2,14 @@
 
 > Understand any codebase in minutes.
 
-CodeAtlas es una aplicación de escritorio que analiza proyectos locales y presenta su estructura y señales arquitectónicas en una interfaz navegable. La versión `1.1` se concentra en proyectos JavaScript y TypeScript.
+CodeAtlas es una aplicación de escritorio que analiza proyectos locales y presenta su estructura y señales arquitectónicas en una interfaz navegable. La versión `1.4` suma soporte para proyectos JVM (Java y Kotlin) además de JavaScript y TypeScript.
 
 ## Versión, fase y descargas
 
 | Campo          | Valor                                                  |
 | -------------- | ------------------------------------------------------ |
-| **Versión**    | `1.3.2` (`package.json`) — visible en la barra de la app |
-| **Fase**       | v1.3 · análisis AST                                    |
+| **Versión**    | `1.4.0` (`package.json`) — visible en la barra de la app |
+| **Fase**       | v0.5 · Expansión JVM                                    |
 | **Licencia**   | MIT                                                    |
 
 ### Plataformas disponibles
@@ -31,6 +31,13 @@ Los binarios se generan automáticamente con GitHub Actions al crear un tag `v*`
 > Los binarios no están firmados: en Windows el SmartScreen y en macOS Gatekeeper mostrarán una advertencia al primer arranque (se salta con "Más información → Ejecutar de todas formas" / clic derecho → Abrir).
 
 ## Estado actual
+
+La v0.5 expande el análisis a proyectos JVM (Java y Kotlin):
+
+- Detección de `pom.xml` (Maven) y `build.gradle`/`build.gradle.kts` (Gradle) como proyectos JVM, con sus dependencias (`groupId:artifactId:version` y scope).
+- Detección de imports Java y Kotlin, resolviendo las clases locales del propio proyecto a su archivo fuente (convención Java: nombre de archivo = nombre de clase). Los imports de la JDK y de librerías externas se conservan sin resolver.
+- Detección de controladores Spring Boot (`@RestController`, `@Controller`, `@RequestMapping`, `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping`) componiendo prefijo + subruta con su método HTTP, tanto en Java como en Kotlin.
+- Los archivos `.java`/`.kt` aparecen en el árbol de archivos y en el grafo como nodos `file`; los imports locales generan aristas `imports`; los proyectos y dependencias JVM generan nodos `package`/`dependency` con aristas `depends-on` (scope `test` → `development`).
 
 La v1.3 migra los detectores a un AST real (`@typescript-eslint/typescript-estree`):
 
@@ -112,6 +119,32 @@ Detecta `import`, `export ... from`, `import(...)` y `require(...)`, incluidos i
 - Los specifiers de `node_modules` y los alias de tsconfig (`@/...`) quedan sin `target` resuelto.
 - Solo se escanean `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs` y `.cjs`.
 
+### Imports JVM (`src/analyzer/jvmimportscan.ts`)
+
+Detecta `import` de Java y Kotlin (`import a.b.C;`, `import a.b.*;`, `import static a.b.C.metodo;`) y resuelve a archivo local cuando la clase importada existe en el proyecto. Límites:
+
+- La resolución asume la convención Java (nombre de archivo = nombre de clase) y el paquete declarado con `package`.
+- Los imports de la JDK (`java.*`, `javax.*`, `jakarta.*`, `kotlin.*`) y de librerías externas quedan sin `target`.
+- Los imports wildcard (`a.b.*`) no se resuelven a un archivo concreto.
+- Solo se escanean `.java` y `.kt`.
+
+### Rutas Spring Boot (`src/analyzer/springscan.ts`)
+
+Detecta controladores Java y Kotlin con `@RestController`/`@Controller`, prefijo `@RequestMapping` de clase y `@GetMapping`/`@PostMapping`/`@PutMapping`/`@PatchMapping`/`@DeleteMapping` (y `@RequestMapping` de método con `method = RequestMethod.X`), componiendo prefijo + subruta. Límites:
+
+- Los argumentos de ruta deben ser literales: variables y concatenaciones no se resuelven.
+- Los arrays de paths (`@RequestMapping({"/a", "/b"})`) toman solo el primer elemento.
+- `@RequestMapping` de método sin método HTTP explícito se ignora (no es una ruta accionable).
+- No se validan los imports de Spring: una anotación con el nombre correcto cuenta aunque el controlador no sea Spring real.
+
+### Proyectos JVM (`src/analyzer/jvmdepscan.ts`)
+
+Detecta `pom.xml` (Maven) y `build.gradle`/`build.gradle.kts` (Gradle) como proyectos JVM con sus dependencias. Límites:
+
+- Maven: parseo de tags XML simple; no resuelve properties (`${...}`) ni dependencias del `parent`.
+- Gradle: solo dependencias con notación `group:artifact[:version]` en la línea; no resuelve `project(...)` ni catálogos de versiones.
+- Un `pom.xml` sin `groupId`/`artifactId` ni dependencias se ignora (inválido o incompleto).
+
 ### Escáner de estructura (`src/analyzer/scanner.ts`)
 
 - Lista fija de carpetas ignoradas (`node_modules`, `.git`, `dist`, `build`…): carpetas de dependencias con otros nombres sí se escanean.
@@ -122,7 +155,7 @@ Detecta `import`, `export ... from`, `import(...)` y `require(...)`, incluidos i
 
 ### Alcance
 
-- v1.3 analiza únicamente proyectos JavaScript y TypeScript.
+- v0.5 analiza proyectos JVM (Java y Kotlin) además de JavaScript y TypeScript.
 
 ## Formato del grafo (`ArchitectureGraph`)
 
@@ -252,6 +285,9 @@ codeatlas/
 │   │   ├── routescan.ts     # Rutas Express (AST + fallback regex)
 │   │   ├── nestscan.ts      # Rutas NestJS (decoradores, regex)
 │   │   ├── importscan.ts    # Imports y require entre módulos (AST + fallback regex)
+│   │   ├── jvmimportscan.ts # Imports Java/Kotlin (paquete → archivo local)
+│   │   ├── springscan.ts    # Rutas Spring Boot (anotaciones, regex)
+│   │   ├── jvmdepscan.ts    # Proyectos JVM y dependencias (pom.xml, gradle)
 │   │   ├── graph.ts         # Grafo común y IDs estables
 │   │   ├── types.ts         # Contratos del análisis
 │   │   └── index.ts         # Orquestación

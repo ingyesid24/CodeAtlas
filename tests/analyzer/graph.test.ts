@@ -4,6 +4,7 @@ import type {
   EnvVarUsage,
   FileNode,
   ImportInfo,
+  JvmProject,
   PackageInfo,
   RouteInfo
 } from '../../src/analyzer/types';
@@ -38,6 +39,7 @@ function emptyInput(overrides: Partial<{
   envVars: EnvVarUsage[];
   routes: RouteInfo[];
   imports: ImportInfo[];
+  jvmProjects: JvmProject[];
 }> = {}) {
   return {
     tree,
@@ -45,6 +47,7 @@ function emptyInput(overrides: Partial<{
     envVars: [],
     routes: [],
     imports: [],
+    jvmProjects: [],
     ...overrides
   };
 }
@@ -228,6 +231,88 @@ describe('buildArchitectureGraph — imports', () => {
 
     const graph = buildArchitectureGraph(emptyInput({ imports }));
 
+    expect(graph.edges.filter((e) => e.type === 'imports')).toHaveLength(0);
+  });
+});
+
+describe('buildArchitectureGraph — proyectos JVM', () => {
+  it('crea un nodo package y dependencias depends-on por cada proyecto JVM', () => {
+    const jvmProjects: JvmProject[] = [
+      {
+        path: 'pom.xml',
+        buildTool: 'maven',
+        groupId: 'com.example',
+        artifactId: 'demo',
+        version: '1.0.0',
+        dependencies: [
+          { groupId: 'org.springframework.boot', artifactId: 'spring-boot-starter-web', version: '3.2.0', scope: 'compile' },
+          { groupId: 'org.junit.jupiter', artifactId: 'junit-jupiter', scope: 'test' }
+        ]
+      }
+    ];
+
+    const graph = buildArchitectureGraph(emptyInput({ jvmProjects }));
+
+    const packageNode = graph.nodes.find((n) => n.type === 'package');
+    expect(packageNode?.label).toBe('demo');
+    expect((packageNode as any).manifestPath).toBe('pom.xml');
+
+    const dependsOnEdges = graph.edges.filter((e) => e.type === 'depends-on');
+    expect(dependsOnEdges).toHaveLength(2);
+
+    const runtimeEdge = dependsOnEdges.find((e) => (e as any).scope === 'runtime');
+    const devEdge = dependsOnEdges.find((e) => (e as any).scope === 'development');
+    expect((runtimeEdge as any).version).toBe('3.2.0');
+    expect((devEdge as any).version).toBe('');
+
+    const dependencyNodes = graph.nodes
+      .filter((n) => n.type === 'dependency')
+      .map((n) => (n as any).name)
+      .sort();
+    expect(dependencyNodes).toEqual([
+      'org.junit.jupiter:junit-jupiter',
+      'org.springframework.boot:spring-boot-starter-web'
+    ]);
+  });
+
+  it('incluye rutas Spring en el grafo como rutas normales', () => {
+    const routes: RouteInfo[] = [
+      { method: 'GET', path: '/users/{id}', file: 'src/main/java/com/example/UserController.java', line: 6 }
+    ];
+
+    const graph = buildArchitectureGraph(emptyInput({ routes }));
+    const routeNode = graph.nodes.find((n) => n.type === 'route');
+
+    expect(routeNode?.label).toBe('GET /users/{id}');
+    expect((routeNode as any).location).toEqual({
+      file: 'src/main/java/com/example/UserController.java',
+      line: 6
+    });
+  });
+
+  it('conecta imports Java resueltos a archivos locales', () => {
+    const imports: ImportInfo[] = [
+      {
+        file: 'src/main/java/com/example/app/Main.java',
+        specifier: 'com.example.util.Helper',
+        line: 2,
+        target: 'src/main/java/com/example/util/Helper.java'
+      }
+    ];
+
+    const graph = buildArchitectureGraph(emptyInput({ imports }));
+    const importEdge = graph.edges.find((e) => e.type === 'imports');
+
+    expect(importEdge?.source).toBe(createFileNodeId('src/main/java/com/example/app/Main.java'));
+    expect(importEdge?.target).toBe(createFileNodeId('src/main/java/com/example/util/Helper.java'));
+  });
+
+  it('no crea edge para imports JVM externos sin target ni dependencia local', () => {
+    const imports: ImportInfo[] = [
+      { file: 'src/Main.java', specifier: 'java.util.List', line: 3 }
+    ];
+
+    const graph = buildArchitectureGraph(emptyInput({ imports }));
     expect(graph.edges.filter((e) => e.type === 'imports')).toHaveLength(0);
   });
 });

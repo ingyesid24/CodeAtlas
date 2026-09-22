@@ -175,6 +175,7 @@ export default function App() {
             <span><strong>{result.fileCount}</strong> archivos</span>
             <span><strong>{result.dirCount}</strong> carpetas</span>
             <span><strong>{result.packages.length}</strong> package.json</span>
+            <span><strong>{result.jvmProjects.length}</strong> proyectos JVM</span>
             <span><strong>{result.envVars.length}</strong> variables de entorno</span>
             <span><strong>{result.routes.length}</strong> rutas</span>
             <span><strong>{result.graph.nodes.length}</strong> nodos</span>
@@ -228,7 +229,7 @@ export default function App() {
 
             <div className="side-panels">
               <section className="panel">
-                <h2>Rutas Express detectadas</h2>
+                <h2>Rutas HTTP detectadas</h2>
                 {result.routes.length === 0 && <p className="muted">No se detectaron rutas.</p>}
                 <RoutesByFile routes={result.routes} />
               </section>
@@ -246,6 +247,18 @@ export default function App() {
                         {Object.keys(pkg.devDependencies ?? {}).length} devDependencies
                       </div>
                     )}
+                  </div>
+                ))}
+              </section>
+
+              <section className="panel">
+                <h2>Proyectos JVM detectados</h2>
+                {result.jvmProjects.length === 0 && <p className="muted">No se detectaron (pom.xml / build.gradle).</p>}
+                {result.jvmProjects.map((project) => (
+                  <div key={project.path} className="pkg-card">
+                    <div className="pkg-name">{project.artifactId ?? project.groupId ?? '(sin nombre)'} <span className="muted">v{project.version ?? '?'}</span></div>
+                    <div className="pkg-path muted">{project.buildTool === 'maven' ? 'Maven' : 'Gradle'} · {project.path}</div>
+                    <div className="pkg-deps muted">{project.dependencies.length} dependencias</div>
                   </div>
                 ))}
               </section>

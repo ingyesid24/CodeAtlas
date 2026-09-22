@@ -112,4 +112,121 @@ describe('analyzeProject', () => {
     expect(scannedAtWith.length).toBeGreaterThan(0);
     expect(restWithout).toEqual(restWith);
   });
+
+  it('analiza proyectos Java/Spring Boot y los integra en el resultado', () => {
+    currentProject = createTempProject({
+      'pom.xml': [
+        '<project>',
+        '  <groupId>com.example</groupId>',
+        '  <artifactId>demo</artifactId>',
+        '  <version>1.0.0</version>',
+        '  <dependencies>',
+        '    <dependency>',
+        '      <groupId>org.springframework.boot</groupId>',
+        '      <artifactId>spring-boot-starter-web</artifactId>',
+        '    </dependency>',
+        '  </dependencies>',
+        '</project>'
+      ].join('\n'),
+      'src/main/java/com/example/UserController.java': [
+        'package com.example;',
+        'import com.example.service.UserService;',
+        'import org.springframework.web.bind.annotation.*;',
+        '@RestController',
+        '@RequestMapping("/users")',
+        'public class UserController {',
+        '  @GetMapping("/{id}")',
+        '  public String get() { return "ok"; }',
+        '}'
+      ].join('\n'),
+      'src/main/java/com/example/service/UserService.java': [
+        'package com.example.service;',
+        'import java.util.List;',
+        'public class UserService {}'
+      ].join('\n')
+    });
+
+    const result = analyzeProject(currentProject);
+
+    expect(result.jvmProjects).toHaveLength(1);
+    expect(result.jvmProjects[0].artifactId).toBe('demo');
+    expect(result.jvmProjects[0].dependencies).toEqual([
+      {
+        groupId: 'org.springframework.boot',
+        artifactId: 'spring-boot-starter-web',
+        version: undefined,
+        scope: 'compile'
+      }
+    ]);
+
+    expect(result.routes).toEqual([
+      {
+        method: 'GET',
+        path: '/users/{id}',
+        file: path.join('src', 'main', 'java', 'com', 'example', 'UserController.java'),
+        line: 7
+      }
+    ]);
+
+    expect(result.imports).toEqual([
+      {
+        file: path.join('src', 'main', 'java', 'com', 'example', 'UserController.java'),
+        specifier: 'com.example.service.UserService',
+        line: 2,
+        target: path.join('src', 'main', 'java', 'com', 'example', 'service', 'UserService.java')
+      },
+      {
+        file: path.join('src', 'main', 'java', 'com', 'example', 'UserController.java'),
+        specifier: 'org.springframework.web.bind.annotation.*',
+        line: 3,
+        target: undefined
+      },
+      {
+        file: path.join('src', 'main', 'java', 'com', 'example', 'service', 'UserService.java'),
+        specifier: 'java.util.List',
+        line: 2,
+        target: undefined
+      }
+    ]);
+
+    const importEdge = result.graph.edges.find(
+      (edge) => edge.type === 'imports' && (edge as any).specifier === 'com.example.service.UserService'
+    );
+    expect(importEdge?.source).toBe(createFileNodeId('src/main/java/com/example/UserController.java'));
+    expect(importEdge?.target).toBe(createFileNodeId('src/main/java/com/example/service/UserService.java'));
+
+    const springDependency = result.graph.nodes.find(
+      (node) => node.type === 'dependency' && (node as any).name === 'org.springframework.boot:spring-boot-starter-web'
+    );
+    expect(springDependency).toBeDefined();
+  });
+
+  it('mantiene el análisis JS/TS intacto frente a proyectos mixtos', () => {
+    currentProject = createTempProject({
+      'package.json': JSON.stringify({ name: 'mixed', version: '1.0.0' }),
+      'server.ts': "import { helper } from './util';\napp.get('/health', h);",
+      'util.ts': 'export const helper = true;',
+      'src/Main.java': [
+        'package com.example;',
+        '@RestController',
+        'public class Main {',
+        '  @GetMapping("/java")',
+        '  public void x() {}',
+        '}'
+      ].join('\n'),
+      'pom.xml': '<project><groupId>com.example</groupId><artifactId>app</artifactId></project>'
+    });
+
+    const result = analyzeProject(currentProject);
+
+    expect(result.routes).toEqual([
+      { method: 'GET', path: '/health', file: 'server.ts', line: 2 },
+      { method: 'GET', path: '/java', file: 'src/Main.java', line: 4 }
+    ]);
+    expect(result.imports).toEqual([
+      { file: 'server.ts', specifier: './util', line: 1, target: 'util.ts' }
+    ]);
+    expect(result.jvmProjects).toHaveLength(1);
+    expect(result.packages).toHaveLength(1);
+  });
 });

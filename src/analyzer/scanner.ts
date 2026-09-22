@@ -5,11 +5,18 @@ import type { FileNode, PackageInfo } from './types';
 // Carpetas que nunca queremos escanear (ruido, no aportan a la arquitectura)
 const IGNORED_DIRS = new Set([
   'node_modules', '.git', 'dist', 'dist-electron', 'build', 'out',
-  'release', '.next', '.vite', 'coverage', '.turbo', '.cache'
+  'release', '.next', '.vite', 'coverage', '.turbo', '.cache',
+  'target', 'classes', 'generated'
 ]);
 
 /** Extensiones de código fuente que interesan a los detectores. */
 export const SOURCE_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs']);
+
+/** Extensiones de código fuente JVM (Java y Kotlin). */
+export const JVM_SOURCE_EXTENSIONS = new Set(['.java', '.kt']);
+
+/** Archivos de manifiesto de proyectos JVM (Maven y Gradle). */
+export const JVM_MANIFEST_NAMES = new Set(['pom.xml', 'build.gradle', 'build.gradle.kts']);
 
 /**
  * Tamaño máximo (en bytes) de un archivo fuente que se analiza. Los archivos
@@ -30,6 +37,21 @@ export interface SourceFile {
  * exclusión que los detectores), para escanearlos una sola vez.
  */
 export function collectSourceFiles(rootPath: string): SourceFile[] {
+  return collectSourceFilesWithExtensions(rootPath, SOURCE_EXTENSIONS);
+}
+
+/**
+ * Recolecta los archivos de código fuente JVM (.java y .kt) del proyecto,
+ * con las mismas reglas de exclusión que el resto de detectores.
+ */
+export function collectJvmSourceFiles(rootPath: string): SourceFile[] {
+  return collectSourceFilesWithExtensions(rootPath, JVM_SOURCE_EXTENSIONS);
+}
+
+function collectSourceFilesWithExtensions(
+  rootPath: string,
+  extensions: Set<string>
+): SourceFile[] {
   const files: SourceFile[] = [];
 
   function walk(currentPath: string, relativePath: string) {
@@ -48,7 +70,7 @@ export function collectSourceFiles(rootPath: string): SourceFile[] {
       }
 
       if (!entry.isFile()) continue;
-      if (!SOURCE_EXTENSIONS.has(path.extname(entry.name))) continue;
+      if (!extensions.has(path.extname(entry.name))) continue;
 
       const fullPath = path.join(currentPath, entry.name);
       try {
@@ -162,6 +184,36 @@ export function findPackageJsonFiles(rootPath: string): PackageInfo[] {
         } catch {
           // package.json inválido o ilegible — lo ignoramos, no bloqueamos el análisis
         }
+      }
+    }
+  }
+
+  walk(rootPath, '');
+  return results;
+}
+
+/**
+ * Busca los archivos de manifiesto JVM del proyecto (pom.xml, build.gradle,
+ * build.gradle.kts) excluyendo node_modules y carpetas de build/dependencias.
+ * Devuelve rutas relativas al root.
+ */
+export function findJvmManifestFiles(rootPath: string): string[] {
+  const results: string[] = [];
+
+  function walk(currentPath: string, relativePath: string) {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(currentPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (IGNORED_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
+        walk(path.join(currentPath, entry.name), path.join(relativePath, entry.name));
+      } else if (entry.isFile() && JVM_MANIFEST_NAMES.has(entry.name)) {
+        results.push(path.join(relativePath, entry.name));
       }
     }
   }
